@@ -1,3 +1,4 @@
+import string
 import networkx as nx
 import osmnx as ox
 import copy
@@ -53,10 +54,10 @@ def truncate_to_polygon(
         min_num=min_num,
         )
     #Remove edges that do not have their name in road_list
-    if road_list:
+    if road_list.isinstance(list):
+        graph = _isolate_roads(graph, road_list)
+    elif road_list.isinstance(string):
         graph = _isolate_road(graph, road_list)
-    return graph
-    return
 
 def truncate_to_bbox(
     graph,
@@ -108,7 +109,24 @@ def truncate_to_bbox(
     graph : networkx.MultiDiGraph
         the truncated graph
     """
-    return
+    truncated = copy.deepcopy(graph)
+    truncated = ox.truncate.truncate_by_bbox(
+        truncated,
+        north,
+        south,
+        east,
+        west,
+        truncate_by_edge=truncate_by_edge, 
+        retain_all=retain_all,
+        quadrat_width=quadrat_width, 
+        min_num=min_num,
+    )
+    #Remove edges that do not have their name in road_list
+    if road_list.isinstance(list):
+        truncated = _isolate_roads(truncated, road_list)
+    elif road_list.isinstance(string):
+        truncated = _isolate_road(truncated, road_list)
+    return truncated
 
 def truncate_around_node(
     graph, 
@@ -148,11 +166,25 @@ def truncate_around_node(
     graph : networkx.MultiDiGraph
         the truncated graph
     """
-    return
+    truncated = copy.deepcopy(graph)
+    truncated = ox.truncate.truncate_graph_dist(
+        truncated,
+        source_node,
+        max_dist=max_dist,
+        weight=weight,
+        retain_all=retain_all,
+        road_list=road_list,
+    )
+    #Remove edges that do not have their name in road_list
+    if road_list.isinstance(list):
+        truncated = _isolate_roads(truncated, road_list)
+    elif road_list.isinstance(string):
+        truncated = _isolate_road(truncated, road_list)
+    return truncated
 
 def _isolate_road(
     graph, 
-    road_list,
+    road,
 ):
     """
     Removes all the edges that do not have an edge attribute 'name', or the value
@@ -169,5 +201,77 @@ def _isolate_road(
     -------
     graph : Networkx.MultiDiGraph
     """
-    return
+    nodeRemover = []
+    #Removing all the edges in the graph that do not have edges that contain the road name
+    for i in graph:
+        for j in graph[i]:
+            for k in graph[i][j]:
+                if graph[i][j][0].get('name') == None:
+                    nodeRemover.append((i, j))
+                    continue
+                elif type(graph[i][j][0]['name']) == list and graph[i][j][0]['name'].count(road) == 0:
+                    nodeRemover.append((i, j))
+                elif graph[i][j][0]['name'] != road:
+                    nodeRemover.append((i, j))
+    while(len(nodeRemover)>0) :
+        a = nodeRemover.pop()
+        if graph[a[0]].get(a[1]) != None:
+            graph.remove_edge(a[0], a[1])
+    #Removing all isolated vertices of the Graph
+    for i in graph:
+        if len(graph[i]) == 0:
+            nodeRemover.append(i)
+    while(len(nodeRemover) > 0):
+        x = nodeRemover.pop()
+        graph.remove_node(x)
+    return graph
 
+def _isolate_roads(
+    graph, 
+    road_list,
+):
+    """
+    Removes all the edges that do not have an edge attribute 'name', or the value
+    attributed to the key, 'name', does not contain a string that is in the road_list
+
+    Parameters
+    -------
+    graph : Networkx.MultiDiGraph
+        input graph
+    road_list : list
+        the roads to remain in the graph
+
+    Returns
+    -------
+    graph : Networkx.MultiDiGraph
+    """
+    remove_list = []
+    #Removing all the edges in the graph that do not have edges that contain the road name
+    for i in graph:
+        for j in graph[i]:
+            for k in graph[i][j]:
+                #Checking if there is a name attribute of the edge
+                if graph[i][j][0].get('name') == None:
+                    remove_list.append((i, j))
+                    continue
+                #Going through the road_list and seeing if any match the name of the edge
+                keep = False
+                for roads in road_list:
+                    if type(graph[i][j][0]['name']) == list and graph[i][j][0]['name'].count(roads) >= 0:
+                        keep = True
+                    elif graph[i][j][0]['name'] == roads:
+                        keep = True
+                if keep == False:
+                    remove_list.append((i, j))
+    while(len(remove_list)>0) :
+        a = remove_list.pop()
+        if graph[a[0]].get(a[1]) != None:
+            graph.remove_edge(a[0], a[1])
+    #Removing all isolated vertices of the Graph
+    for i in graph:
+        if len(graph[i]) == 0:
+            remove_list.append(i)
+    while(len(remove_list) > 0):
+        x = remove_list.pop()
+        graph.remove_node(x)
+    return graph
