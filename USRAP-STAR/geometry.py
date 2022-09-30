@@ -1,3 +1,4 @@
+import string
 import networkx as nx
 import osmnx as ox
 from shapely.geometry import Point, LineString
@@ -23,35 +24,20 @@ def convert_to_linestrings(
     a dictionary containing either all roadnames in road_list or the graph as 
     the key, and the Linestring of the road as the value. 
     """
+    if road_list.isinstance(string):
+    elif road_list.isinstance(list):
+    else:
     endpoints = find_end_nodes(graph)
     edge_list = ox.distance.shortest_path(graph, endpoints[0], endpoints[-1], weight='length')
     size = _road_polyline_length(graph, endpoints, edge_list)
-    road = [None] * size
-    NodeTracker = endpoints[0]
-    index = 0
-    for i in edge_list:
-        if i == endpoints[0]:
-            continue
-        for j in graph[NodeTracker]:
-            if i == j:
-                if graph[NodeTracker][j][0].get('geometry') != None:
-                    for k in graph[NodeTracker][j][0]['geometry'].coords:
-                        if k == (graph.nodes[j]['x'], graph.nodes[j]['y']):
-                            break
-                        road[index] = k
-                        index += 1
-                else:
-                    road[index] = (graph.nodes[NodeTracker]['x'], graph.nodes[NodeTracker]['y'])
-                    index += 1
-                NodeTracker = j
-    return LineString(road)
+    
 
 def find_end_nodes(graph):
     """
     Find all the nodes in an osmnx graph that are endnodes from the _is_endpoint
     function in the osmnx library
 
-    :param Graph: This is the graph where the endpoints to be found are in.
+    :param graph: This is the graph where the endpoints to be found are in.
     :return: A list of node ids of the endpoint nodes.
     """
     endNodes = []
@@ -64,7 +50,7 @@ def _road_polyline_length(graph, endpoints, edge_list):
     """ 
     Finds how many points are in the LineString that is the road.
 
-    :param Graph: The osmnx graph that is being analyzed and has already 
+    :param graph: The osmnx graph that is being analyzed and has already 
         had isolateRoad called on it
     :param endpoints: The list of endpoints in Graph founded with the function
         findEndNodes
@@ -88,4 +74,84 @@ def _road_polyline_length(graph, endpoints, edge_list):
                 NodeTracker = j
     return count
 
-    
+def _generate_road_polyline(graph, endpoints, edge_list, size):
+    road = [None] * size
+    NodeTracker = endpoints[0]
+    index = 0
+    for i in edge_list:
+        if i == endpoints[0]:
+            continue
+        for j in graph[NodeTracker]:
+            if i == j:
+                if graph[NodeTracker][j][0].get('geometry') != None:
+                    for k in graph[NodeTracker][j][0]['geometry'].coords:
+                        if k == (graph.nodes[j]['x'], graph.nodes[j]['y']):
+                            break
+                        road[index] = k
+                        index += 1
+                else:
+                    road[index] = (graph.nodes[NodeTracker]['x'], graph.nodes[NodeTracker]['y'])
+                    index += 1
+                NodeTracker = j
+    return LineString(road)
+
+def _find_roads(graph):
+    """
+    Create a list of all the roads in the system.
+
+    :param graph: networkx.MultiDiGraph input graph
+    :returns: a list of the roads in the graph
+    """
+    road_list = []
+    for i in graph:
+        for j in graph[i]:
+            for k in graph[i][j]:
+                if k[0].get('name') == None:
+                    continue
+                elif k[0]['name'].isinstance(string) and road_list.count(k[0]['name']) == 0:
+                    road_list.append(k[0]['name'])
+    return road_list
+
+def _isolate_road(
+    graph, 
+    road,
+):
+    """
+    Removes all the edges that do not have an edge attribute 'name', or the value
+    attributed to the key, 'name', does not contain a string that is in the road_list
+
+    Parameters
+    -------
+    graph : Networkx.MultiDiGraph
+        input graph
+    road_list : string
+        the road to remain in the graph
+
+    Returns
+    -------
+    graph : Networkx.MultiDiGraph
+    """
+    nodeRemover = []
+    #Removing all the edges in the graph that do not have edges that contain the road name
+    for i in graph:
+        for j in graph[i]:
+            for k in graph[i][j]:
+                if graph[i][j][0].get('name') == None:
+                    nodeRemover.append((i, j))
+                    continue
+                elif type(graph[i][j][0]['name']) == list and graph[i][j][0]['name'].count(road) == 0:
+                    nodeRemover.append((i, j))
+                elif graph[i][j][0]['name'] != road:
+                    nodeRemover.append((i, j))
+    while(len(nodeRemover)>0) :
+        a = nodeRemover.pop()
+        if graph[a[0]].get(a[1]) != None:
+            graph.remove_edge(a[0], a[1])
+    #Removing all isolated vertices of the Graph
+    for i in graph:
+        if len(graph[i]) == 0:
+            nodeRemover.append(i)
+    while(len(nodeRemover) > 0):
+        x = nodeRemover.pop()
+        graph.remove_node(x)
+    return graph
