@@ -1,6 +1,7 @@
 import string
 import networkx as nx
 import osmnx as ox
+import copy
 from shapely.geometry import Point, LineString
 
 def convert_to_linestrings(
@@ -24,20 +25,32 @@ def convert_to_linestrings(
     a dictionary containing either all roadnames in road_list or the graph as 
     the key, and the Linestring of the road as the value. 
     """
+    linestrings = {}
     if road_list.isinstance(string):
         road = _isolate_road(graph, road_list)
         endpoints = find_end_nodes(graph)
         edge_list = ox.distance.shortest_path(graph, endpoints[0], endpoints[-1], weight='length')
         size = _road_polyline_length(graph, endpoints, edge_list)
+        polylines = _generate_road_polyline(graph, endpoints, edge_list, size)
+        linestrings[road_list] = polylines
     elif road_list.isinstance(list):
         for road in road_list:
-            endpoints = find_end_nodes(graph)
-            edge_list = ox.distance.shortest_path(graph, endpoints[0], endpoints[-1], weight='length')
-            size = _road_polyline_length(graph, endpoints, edge_list)
+            isolated = _isolate_road(graph, road)
+            endpoints = find_end_nodes(isolated)
+            edge_list = ox.distance.shortest_path(isolated, endpoints[0], endpoints[-1], weight='length')
+            size = _road_polyline_length(isolated, endpoints, edge_list)
+            polylines = _generate_road_polyline(isolated, endpoints, edge_list, size)
+            linestrings[road] = polylines
     else:
-    endpoints = find_end_nodes(graph)
-    edge_list = ox.distance.shortest_path(graph, endpoints[0], endpoints[-1], weight='length')
-    size = _road_polyline_length(graph, endpoints, edge_list)
+        road_list = _find_roads(graph)
+        for road in road_list:
+            isolated = _isolate_road(graph, road)
+            endpoints = find_end_nodes(isolated)
+            edge_list = ox.distance.shortest_path(isolated, endpoints[0], endpoints[-1], weight='length')
+            size = _road_polyline_length(isolated, endpoints, edge_list)
+            polylines = _generate_road_polyline(isolated, endpoints, edge_list, size)
+            linestrings[road] = polylines
+    return linestrings
     
 
 def find_end_nodes(graph):
@@ -140,26 +153,27 @@ def _isolate_road(
     graph : Networkx.MultiDiGraph
     """
     nodeRemover = []
+    cgraph = copy.deepcopy(graph)
     #Removing all the edges in the graph that do not have edges that contain the road name
-    for i in graph:
-        for j in graph[i]:
-            for k in graph[i][j]:
-                if graph[i][j][0].get('name') == None:
+    for i in cgraph:
+        for j in cgraph[i]:
+            for k in cgraph[i][j]:
+                if cgraph[i][j][0].get('name') == None:
                     nodeRemover.append((i, j))
                     continue
-                elif type(graph[i][j][0]['name']) == list and graph[i][j][0]['name'].count(road) == 0:
+                elif type(cgraph[i][j][0]['name']) == list and cgraph[i][j][0]['name'].count(road) == 0:
                     nodeRemover.append((i, j))
-                elif graph[i][j][0]['name'] != road:
+                elif cgraph[i][j][0]['name'] != road:
                     nodeRemover.append((i, j))
     while(len(nodeRemover)>0) :
         a = nodeRemover.pop()
-        if graph[a[0]].get(a[1]) != None:
-            graph.remove_edge(a[0], a[1])
+        if cgraph[a[0]].get(a[1]) != None:
+            cgraph.remove_edge(a[0], a[1])
     #Removing all isolated vertices of the Graph
-    for i in graph:
-        if len(graph[i]) == 0:
+    for i in cgraph:
+        if len(cgraph[i]) == 0:
             nodeRemover.append(i)
     while(len(nodeRemover) > 0):
         x = nodeRemover.pop()
-        graph.remove_node(x)
-    return graph
+        cgraph.remove_node(x)
+    return cgraph
