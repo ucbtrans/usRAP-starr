@@ -25,7 +25,15 @@ def convert_to_linestrings(
     the key, and the Linestring of the road as the value. 
     """
     if road_list.isinstance(string):
+        road = _isolate_road(graph, road_list)
+        endpoints = find_end_nodes(graph)
+        edge_list = ox.distance.shortest_path(graph, endpoints[0], endpoints[-1], weight='length')
+        size = _road_polyline_length(graph, endpoints, edge_list)
     elif road_list.isinstance(list):
+        for road in road_list:
+            endpoints = find_end_nodes(graph)
+            edge_list = ox.distance.shortest_path(graph, endpoints[0], endpoints[-1], weight='length')
+            size = _road_polyline_length(graph, endpoints, edge_list)
     else:
     endpoints = find_end_nodes(graph)
     edge_list = ox.distance.shortest_path(graph, endpoints[0], endpoints[-1], weight='length')
