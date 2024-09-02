@@ -56,7 +56,7 @@ def generate_graph_from_place(
         e.g., '["power"~"line"]' or '["highway"~"motorway|trunk"]'. Also pass
         in a network_type that is in settings.bidirectional_network_types if
         you want graph to be fully bi-directional.
-    road_list : string or list
+    road_list : string
         a filter to only contain certain roads within the graph
 
     Returns
@@ -75,10 +75,9 @@ def generate_graph_from_place(
         clean_periphery=clean_periphery, 
         custom_filter=custom_filter,
     )
+    graph = ox.get_undirected(ox.get_digraph(graph))
     #Remove edges that do not have their name in road_list
-    if road_list.isinstance(list):
-        graph = _isolate_roads(graph, road_list)
-    elif road_list.isinstance(string):
+    if road_list:
         graph = _isolate_road(graph, road_list)
     return graph
 
@@ -131,7 +130,7 @@ def generate_graph_from_address(
         e.g., '["power"~"line"]' or '["highway"~"motorway|trunk"]'. Also pass
         in a network_type that is in settings.bidirectional_network_types if
         you want graph to be fully bi-directional.
-    road_list : string or list
+    road_list : string
         a filter to only contain certain roads within the graph
 
     Returns
@@ -151,10 +150,9 @@ def generate_graph_from_address(
         clean_periphery=clean_periphery, 
         custom_filter=custom_filter,
     )
+    graph = ox.get_undirected(ox.get_digraph(graph))
     #Remove edges that do not have their name in road_list
-    if road_list.isinstance(list):
-        graph = _isolate_roads(graph, road_list)
-    elif road_list.isinstance(string):
+    if road_list:
         graph = _isolate_road(graph, road_list)
     return graph
 
@@ -202,7 +200,7 @@ def generate_graph_from_bbox(
         e.g., '["power"~"line"]' or '["highway"~"motorway|trunk"]'. Also pass
         in a network_type that is in settings.bidirectional_network_types if
         you want graph to be fully bi-directional.
-    road_list : string or list
+    road_list : string
         a filter to only contain certain roads within the graph
 
     Returns
@@ -222,10 +220,9 @@ def generate_graph_from_bbox(
         clean_periphery=clean_periphery, 
         custom_filter=custom_filter,
     )
+    graph = ox.get_undirected(ox.get_digraph(graph))
     #Remove edges that do not have their name in road_list
-    if road_list.isinstance(list):
-        graph = _isolate_roads(graph, road_list)
-    elif road_list.isinstance(string):
+    if road_list:
         graph = _isolate_road(graph, road_list)
     return graph
 
@@ -274,7 +271,7 @@ def generate_graph_from_point(
         e.g., '["power"~"line"]' or '["highway"~"motorway|trunk"]'. Also pass
         in a network_type that is in settings.bidirectional_network_types if
         you want graph to be fully bi-directional.
-    road_list : string or list
+    road_list : string
         a filter to only contain certain roads within the graph
 
     Returns
@@ -293,10 +290,9 @@ def generate_graph_from_point(
         clean_periphery=clean_periphery, 
         custom_filter=custom_filter,
     )
+    graph = ox.get_undirected(ox.get_digraph(graph))
     #Remove edges that do not have their name in road_list
-    if road_list.isinstance(list):
-        graph = _isolate_roads(graph, road_list)
-    elif road_list.isinstance(string):
+    if road_list:
         graph = _isolate_road(graph, road_list)
     return graph
 
@@ -336,7 +332,7 @@ def generate_graph_from_polygon(
         e.g., '["power"~"line"]' or '["highway"~"motorway|trunk"]'. Also pass
         in a network_type that is in settings.bidirectional_network_types if
         you want graph to be fully bi-directional.
-    road_list : string or list
+    road_list : string
         a filter to only contain certain roads within the graph
 
     Returns
@@ -353,10 +349,9 @@ def generate_graph_from_polygon(
         clean_periphery=clean_periphery, 
         custom_filter=custom_filter,
     )
+    graph = ox.get_undirected(ox.get_digraph(graph))
     #Remove edges that do not have their name in road_list
-    if road_list.isinstance(list):
-        graph = _isolate_roads(graph, road_list)
-    elif road_list.isinstance(string):
+    if road_list:
         graph = _isolate_road(graph, road_list)
     return graph
 
@@ -381,7 +376,7 @@ def generate_graph_from_xml_file(
     retain_all : bool
         if True, return the entire graph even if it is not connected.
         otherwise, retain only the largest weakly connected component.
-    road_list : string or list
+    road_list : string
         a filter to only contain certain roads within the graph
 
     Returns
@@ -395,10 +390,9 @@ def generate_graph_from_xml_file(
         simplify=simplify, 
         retain_all=retain_all,
     )
+    graph = ox.get_undirected(ox.get_digraph(graph))
     #Remove edges that do not have their name in road_list
-    if road_list.isinstance(list):
-        graph = _isolate_roads(graph, road_list)
-    elif road_list.isinstance(string):
+    if road_list:
         graph = _isolate_road(graph, road_list)
     return graph
 
@@ -446,53 +440,4 @@ def _isolate_road(
         graph.remove_node(x)
     return graph
 
-def _isolate_roads(
-    graph, 
-    road_list,
-):
-    """
-    Removes all the edges that do not have an edge attribute 'name', or the value
-    attributed to the key, 'name', does not contain a string that is in the road_list
-
-    Parameters
-    -------
-    graph : Networkx.MultiDiGraph
-        input graph
-    road_list : list
-        the roads to remain in the graph
-
-    Returns
-    -------
-    graph : Networkx.MultiDiGraph
-    """
-    remove_list = []
-    #Removing all the edges in the graph that do not have edges that contain the road name
-    for i in graph:
-        for j in graph[i]:
-            for k in graph[i][j]:
-                #Checking if there is a name attribute of the edge
-                if graph[i][j][0].get('name') == None:
-                    remove_list.append((i, j))
-                    continue
-                #Going through the road_list and seeing if any match the name of the edge
-                keep = False
-                for roads in road_list:
-                    if type(graph[i][j][0]['name']) == list and graph[i][j][0]['name'].count(roads) >= 0:
-                        keep = True
-                    elif graph[i][j][0]['name'] == roads:
-                        keep = True
-                if keep == False:
-                    remove_list.append((i, j))
-    while(len(remove_list)>0) :
-        a = remove_list.pop()
-        if graph[a[0]].get(a[1]) != None:
-            graph.remove_edge(a[0], a[1])
-    #Removing all isolated vertices of the Graph
-    for i in graph:
-        if len(graph[i]) == 0:
-            remove_list.append(i)
-    while(len(remove_list) > 0):
-        x = remove_list.pop()
-        graph.remove_node(x)
-    return graph
 
