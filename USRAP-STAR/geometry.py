@@ -2,6 +2,7 @@ import networkx as nx
 import osmnx as ox
 from shapely.geometry import LineString
 from collections import defaultdict
+import copy
 
 def make_road_list(graph):
     """
@@ -105,6 +106,7 @@ def find_end_nodes(graph):
 def _isolate_road(
     graph, 
     road,
+    name_type="name"
 ):
     """
     Removes all the edges that do not have an edge attribute 'name', or the value
@@ -116,22 +118,25 @@ def _isolate_road(
         input graph
     road_list : string
         the road to remain in the graph
+    name_type : string
+        the category to search for when isolating a road, (either 'name' or 'ref')
 
     Returns
     -------
     graph : Networkx.MultiDiGraph
     """
     nodeRemover = []
+    graph = copy.deepcopy(graph)
     #Removing all the edges in the graph that do not have edges that contain the road name
     for i in graph:
         for j in graph[i]:
             for k in graph[i][j]:
-                if graph[i][j][0].get('name') == None:
+                if graph[i][j][0].get(name_type) == None:
                     nodeRemover.append((i, j))
                     continue
-                elif type(graph[i][j][0]['name']) == list and graph[i][j][0]['name'].count(road) == 0:
+                elif type(graph[i][j][0][name_type]) == list and graph[i][j][0][name_type].count(road) == 0:
                     nodeRemover.append((i, j))
-                elif graph[i][j][0]['name'] != road:
+                elif graph[i][j][0][name_type] != road:
                     nodeRemover.append((i, j))
     while(len(nodeRemover)>0) :
         a = nodeRemover.pop()
@@ -143,5 +148,56 @@ def _isolate_road(
             nodeRemover.append(i)
     while(len(nodeRemover) > 0):
         x = nodeRemover.pop()
+        graph.remove_node(x)
+    return graph
+
+def _isolate_roads(
+    graph, 
+    road_list,
+):
+    """
+    Removes all the edges that do not have an edge attribute 'name', or the value
+    attributed to the key, 'name', does not contain a string that is in the road_list
+
+    Parameters
+    -------
+    graph : Networkx.MultiDiGraph
+        input graph
+    road_list : list
+        the roads to remain in the graph
+
+    Returns
+    -------
+    graph : Networkx.MultiDiGraph
+    """
+    remove_list = []
+    graph = copy.deepcopy(graph)
+    #Removing all the edges in the graph that do not have edges that contain the road name
+    for i in graph:
+        for j in graph[i]:
+            for k in graph[i][j]:
+                #Checking if there is a name attribute of the edge
+                if graph[i][j][0].get('name') == None:
+                    remove_list.append((i, j))
+                    continue
+                #Going through the road_list and seeing if any match the name of the edge
+                keep = False
+                for roads in road_list:
+                    if type(graph[i][j][0]['name']) == list and graph[i][j][0]['name'].count(roads) >= 0:
+                        keep = True
+                    elif graph[i][j][0]['name'] == roads:
+                        keep = True
+                if keep == False:
+                    remove_list.append((i, j))
+    while(len(remove_list)>0) :
+        a = remove_list.pop()
+        if graph[a[0]].get(a[1]) != None:
+            graph.remove_edge(a[0], a[1])
+    #Removing all isolated vertices of the Graph
+    for i in graph:
+        if len(graph[i]) == 0:
+            remove_list.append(i)
+    while(len(remove_list) > 0):
+        x = remove_list.pop()
         graph.remove_node(x)
     return graph
