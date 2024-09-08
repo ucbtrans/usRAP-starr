@@ -18,34 +18,31 @@ def interpolate_roads(
 
     Returns
     --------
-    interpolated : a dictionary with the road name as key and a list of list of points that is the road segments
+    a dictionary with the road name as key and a list of list of points that is the road segments
     """
     interpolated = defaultdict(list)
-    index = 0         #Keeps track of coordinates passed
-    distance_temp = 0 #Keeps track of distance passed
+    index = 0
+    distance_temp = 0
     for i in roads:
         for j in roads[i]:
-            if len(j) == 0:
-                continue
-            node = j[0]
-            path = []
-            index = 0
-            while index < len(j)-1:
-                #Find distance to next point
-                distance_next_point = ox.distance.great_circle_vec(node[0], node[1], j[index+1][0], j[index+1][1])
-                #Go to next point if no point needs to be recorded
-                if distance_next_point < distance_temp:
-                    distance_temp -= distance_next_point
-                    index += 1
-                    node = j[index]
-                #Find the point a certain distance away
-                else:
-                    bearing = ox.bearing.calculate_bearing(node[0], node[1], j[index+1][0], j[index+1][1])
-                    coord = intermediate_point(node[0], node[1], bearing, distance_temp)
-                    path.append(coord)
-                    node = coord
-                    distance_temp = distance
-            #Add the coordinate list to the data structure
+            for k in j:
+                if len(k) == 0:
+                    continue
+                node = k[0]
+                path = []
+                index = 0
+                while index < len(k)-1:
+                    distance_next_point = ox.distance.great_circle_vec(node[0], node[1], k[index+1][0], k[index+1][1])
+                    if distance_next_point < distance_temp:
+                        distance_temp -= distance_next_point
+                        index += 1
+                        node = k[index]
+                    else:
+                        bearing = ox.bearing.calculate_bearing(node[0], node[1], k[index+1][0], k[index+1][1])
+                        coord = intermediate_point(node[0], node[1], bearing, distance_temp)
+                        path.append((coord, bearing))
+                        node = coord
+                        distance_temp = distance
             if len(path):
                 interpolated[i].append(path)
     return interpolated
